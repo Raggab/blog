@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<body leftmargin="0" topmargin="0" marginheight="0" marginwidth="0" scroll="no">
+<!-- AdRiver (c) Flash Loader. Last edited by A.Fedotov 23.11.2015 -->
+<script type="text/javascript">
+var ar_img			= '1.gif'||'',
+	ar_swf			= ''||'',
+	ar_flashver		= parseInt('5')||0,
+	ar_quality		= 'best',
+	ar_gif_href		= '',
+	ar_wmode		= 'opaque',
+	ar_flash_pixels	= '',
+	ar_gif_pixels	= '',
+	ar_html_name    = ''||'',
+	ar_html_pixels	= '';
+
+function ar_flver(d,n,m,f){n=navigator;f='Shockwave Flash';if((m=n.mimeTypes)&&(m=m["application/x-shockwave-flash"])&&m.enabledPlugin&&(n=n.plugins)&&n[f]){d=n[f].description}else if(window.ActiveXObject){try{d=(new ActiveXObject((f+'.'+f).replace(/ /g,''))).GetVariable('$version')}catch(e){}}return parseInt(d?d.replace(/\D+/,'').split(/\D+/)[0]:0)}
+function ar_p(p,v){return typeof(v)=='undefined'?'':p+'='+v}
+function ar_fp(p,v){return '<param name="'+p+'" value="'+v+'">'}
+function httplize(s){return ((/^\/\//).test(s)?location.protocol:'')+s}
+function addEvent(e,t,f){
+	if (e.addEventListener) { e.addEventListener(t, f, false); }
+	else if (e.attachEvent) { e.attachEvent('on'+t, f); }
+}
+function removeEvent(e,t,f){
+	if (e.removeEventListener) { e.removeEventListener(t, f, false); }
+	else if (e.detachEvent) { e.detachEvent('on'+t, f); }
+}
+function bind(func, context){return function(){return func.apply(context, arguments);};}
+function getEvent(n){return httplize('//' + _.rhost + '/cgi-bin/event.cgi?' + obj2str(extendL({ntype: _.ar_ntype, xpid: '', bid: 0, sid: 0, bt: 0, ad: 0, nid: 0, rnd: 0, sliceid: 0}, _)) + '&type=' + n);}
+
+function extendL(l,r){for(var i in l)l[i]=r[i]||l[i];return l}
+function obj2str(o){var l=[];for(var i in o)l.push(ar_p(i,o[i]));return l.join("&")}
+function str2obj(s){var a=s.split("&"),o={},p;for(var i in a){p=a[i].split("=");o[p[0]]=p[1]}return o}
+
+function getStyle(e,s){
+	if (e.currentStyle) { return e.currentStyle[s]||''; }
+	else if (window.getComputedStyle) { return window.getComputedStyle(e,null)[s]||''; }
+}
+function getScroll(){
+	var g = {}, d = window.document, db = d.body, de = d.documentElement, cm = d.compatMode == 'CSS1Compat';
+	g.sl = window.pageXOffset || cm && de.scrollLeft || db.scrollLeft;
+	g.st = window.pageYOffset || cm && de.scrollTop || db.scrollTop;
+	return g;
+}
+function getCoords(e,scroll) {
+	var box = e.getBoundingClientRect();
+
+	if (scroll) {
+		var sg = getScroll();
+		return {left: box.left + sg.sl, top: box.top + sg.st};
+	}
+
+	return box;
+}
+function getOffsetSum(e,scroll) {
+	var top = 0, left = 0, fixed = false, sg;
+
+	while(e) {
+		if (getStyle(e, 'position') === 'fixed') fixed = true;
+		top += e.offsetTop;
+		left += e.offsetLeft;
+		e = e.offsetParent;
+	}
+
+	if (scroll && fixed) {
+		sg = getScroll();
+		return {left: left + sg.sl, top: top + sg.st};
+	}
+
+	if (!scroll && !fixed) {
+		sg = getScroll();
+		return {left: left - sg.sl, top: top - sg.st};
+	}
+
+	return {left: left, top: top};
+}
+function getPosition(e,scroll){
+	var box = e.getBoundingClientRect ? getCoords(e,scroll) : getOffsetSum(e,scroll);
+	return {left: Math.round(box.left), top: Math.round(box.top)};
+}
+var ar_clickCoord = {
+	_putRes: function (res, el) {
+		function put(custom, n, val) {
+			var r = new RegExp(n + '=.*?(;|$)', 'i');
+			custom = r.test(custom) ? custom.replace(r, n + '=' + val + '$1') : (custom + (custom ? ';' : '') + n + '=' + val);
+			return custom;
+		}
+
+		if (el.href.indexOf('custom=') !== -1) {
+			el.href = el.href.replace(/(?:custom=(.*?)(&|$))/i, function (s, custom, end) {
+				custom = put(custom, 201, res.x);
+				custom = put(custom, 202, res.y);
+				custom = put(custom, 206, 'js');
+
+				return 'custom=' + custom + end;
+			});
+		} else { el.href += '&custom=201=' + res.x + ';202=' + res.y + ';206=js'; }
+	},
+	calc: function (ev, link, el) {
+		var click = {x: ev.clientX, y: ev.clientY},
+			ph = getPosition(el),
+			res = {x: click.x - ph.left, y: click.y - ph.top};
+		this._putRes(res, link);
+	}
+};
+var checkOver = {
+	init: function (ph) {
+		this.p = ph;
+		this.timer = 0;
+		this.delay = 500;
+
+		this.handleOver = bind(this.over, this);
+		this.handleOut = bind(this.out, this);
+
+		addEvent(this.p, 'mouseover', this.handleOver);
+		addEvent(this.p, 'mouseout', this.handleOut);
+	},
+	over: function () { this.timer = setTimeout(bind(this.complete, this), this.delay); },
+	out: function () { clearTimeout(this.timer); },
+	complete: function () {
+		ar_sendPix(getEvent(100));
+		this.end();
+	},
+	end: function () {
+		removeEvent(this.p, 'mouseover', this.handleOver);
+		removeEvent(this.p, 'mouseout', this.handleOut);
+	}
+};
+
+var url = location.href,
+	_ = str2obj(url.substr(url.indexOf("?")+1)).html_params;
+if (_){
+	function rndRep(s){return s.replace(/!\[rnd\]/g,_.rnd)}
+	function ar_c(s){return !s||(/^http(s|):\/\/|^\/\//i).test(s)?s:_.comppath+s}
+	function ar_sendPix(s,b,i){if(!s)return;s=rndRep(s.replace(/!\[ref\]/,escape(document.referrer||'unknown')));if(b=document.body){i=document.createElement('IMG');i.style.position='absolute';i.style.width=i.style.height='0px';i.onload=i.onerror=function(){b.removeChild(i);i=b=null};i.src=s;b.insertBefore(i,b.firstChild);}else new Image().src=s;return true}
+	function ar_sendPixs(ps) {
+		ps = ps.split(', ');
+		for (var i in ps) if (ps.hasOwnProperty(i) && ps[i]) ar_sendPix(httplize(rndRep(ps[i])));
+	}
+
+	_ = str2obj(unescape(_));
+	_.target = _.target&&_.target.indexOf('_top')!=-1 ? '_top' : '_blank';
+	_.comppath = httplize(url.substring(0, url.indexOf('index.html')));
+	_.rhost = _.rhost || 'ad.adriver.ru';
+	_.ar_pass = unescape(_.ar_pass || '');
+
+	ar_redirect = httplize(_.url ? unescape(_.url) : ('//' + _.rhost + '/cgi-bin/click.cgi?'
+		+ obj2str(extendL({bid: 0, ntype: _.ar_ntype, sid: 0, bn: 0, ad: 0, nid: 0, bt: 0, pz: 0, xpid: '', rnd: 0}, _)) + "&rleurl="));
+
+	ar_wmode = ar_wmode||'opaque';
+	ar_quality = ar_quality||'best';
+	ar_swf = rndRep(ar_c(ar_swf));
+	ar_img = rndRep(ar_c(ar_img));
+	ar_html_name = rndRep(ar_c(ar_html_name));
+	ar_gif_href = rndRep(ar_gif_href);
+
+	var ar_metrics = ar_p(' width', _.width) + ar_p(' height', _.height),
+		ar_html = '',
+		ar_cr_id = '_cr_' + _.bid + Math.round(Math.random() * 1000000),
+		ar_pixs;
+
+	if (ar_html_name) {
+		ar_pixs = ar_html_pixels;
+
+		ar_html = '<iframe id="' + ar_cr_id + '" name="' + ar_cr_id + '"' + ar_metrics + ' marginwidth=0 marginheight=0 scrolling=no vspace=0 hspace=0 frameborder=0 src="' + ar_html_name + (/\?/.test(ar_html_name) ? '&' : '?') + 'html_params='
+				+escape(
+					ar_p('target', _.target) +
+					ar_p('&rhost', _.rhost) +
+					ar_p('&bid', _.bid) +
+					ar_p('&sid', _.sid) +
+					ar_p('&rnd', _.rnd) +
+					ar_p('&pz', _.pz) +
+					ar_p('&ad', _.ad) +
+					ar_p('&bt', _.bt) +
+					ar_p('&bn', _.bn) +
+					ar_p('&ar_sliceid', _.sliceid) +
+					ar_p('&ntype', _.ar_ntype) +
+					ar_p('&nid', _.nid) +
+					ar_p('&xpid', _.xpid) +
+					ar_p('&url', escape(ar_redirect)) +
+					ar_p('&CompPath', escape(_.comppath)) +
+					ar_p('&ar_pass',  escape(_.ar_pass))
+				)
+				+'"><\/iframe>';
+	} else if (ar_flver()>=ar_flashver&&ar_swf!='') {
+		ar_pixs = ar_flash_pixels;
+
+		var ar_flashvars = 'link1=' + escape(ar_redirect)
+			+ ar_p('&target', _.target)
+			+ ar_p('&ar_comppath', escape(_.comppath))
+			+ ar_p('&ar_pass', escape(_.ar_pass))
+			+ ar_p('&ar_bid', _.bid)
+			+ ar_p('&ar_bt', _.bt)
+			+ ar_p('&ar_ad', _.ad)
+			+ ar_p('&ar_nid', _.nid)
+			+ ar_p('&ar_rnd', _.rnd)
+			+ ar_p('&ar_pz', _.pz)
+			+ ar_p('&ar_bn', _.bn)
+			+ ar_p('&ar_ntype', _.ar_ntype)
+			+ ar_p('&ar_sliceid', _.sliceid)
+			+ ar_p('&ar_sid', _.sid)
+			+ ar_p('&ar_xpid', _.xpid)
+			+ ar_p('&ar_rhost', escape(_.rhost));
+
+		ar_html = window.ActiveXObject
+			? '<object id="' + ar_cr_id + '" classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"' + ar_metrics + '>'
+				+ ar_fp('movie', ar_swf)
+				+ ar_fp('wmode', ar_wmode)
+				+ ar_fp('quality', ar_quality)
+				+ ar_fp('flashvars', ar_flashvars)
+				+ ar_fp('play', 'true')
+				+ ar_fp('loop', 'true')
+				+ ar_fp('menu', 'false')
+				+ ar_fp('allowScriptAccess', 'always')
+				+ ar_fp('allowFullScreen', 'true')
+				+ '</object>'
+			: '<embed id="' + ar_cr_id + '" type="application/x-shockwave-flash" menu=false allowFullScreen=true allowScriptAccess=always play=true loop=true src="'
+				+ ar_swf + '" wmode=' + ar_wmode + ' quality=' + ar_quality + ' flashvars="' + ar_flashvars + '"'
+				+ ar_metrics + '>';
+	} else if (ar_img) {
+		ar_pixs = ar_gif_pixels;
+
+		ar_html = '<a href="' + ar_redirect + escape(ar_gif_href) + '" onclick="ar_clickCoord.calc(event, this, document.body); return ar_sendPix(\''+_.ar_pass+'\');" target=' + _.target + '><img id="' + ar_cr_id + '" src="' + ar_img + '"' + ar_metrics + ' alt="" border=0></a>';
+	}
+
+	if (url.indexOf('mngcgi')==-1) ar_sendPixs(ar_pixs);
+
+	document.write(ar_html);
+
+	checkOver.init(document.getElementById(ar_cr_id));
+}
+</script>
+</body>
+</html>ÇÆz"ê      \õé›\õéﬁ@0”∏\§…]  Á    :https://servers1.adriver.ru/images/0005685/0005685309/0/index.html?html_params=rhost%3Dad.adriver.ru%26sid%3D187537%26sz%3D142208%26ad%3D660570%26pid%3D2766205%26bid%3D5685309%26ar_ntype%3D0%26xpid%3DD8svnWrASOxmIBqHw1JLzNIIa0Ta_78ZaLkuFOcoi2gX8UhK23IPszh04N1cdhOe9Tk1bDdVec481g-kTGiI8DjLJ0Jfj-a3q08-3-A%26ar_pass%3Dhttps://adclick.g.doubleclick.net/aclk%253Fsa%253DL%2526ai%253DCAqtU3I6bXLb8G465YOrEn9APp4OG_1CVgJ3blgHAjbcBEAEgAGCE5fGFvB6CARdjYS1wdWItNDkwNjc1MzI2NjQ0ODMwMMgBCakCGPPBfSuUUD6oAwGqBPcBT9AFzLfL4JZ1MgwGctOikxrHBPWUJNvHZERGCskt-MPDUmnXEFfkYOigXZ_bG2bHHyzsy9AqpCVIx2PfmFZ2JRuVBYbjuQ0DhzwVbf2DMunVOXi_9oABWrLGTuXPDi813Wsw198d8f_ltNCX8emdUfzraiZIJ7vUYENvL2NENy58R7biMuE-PT3Uoi1jwEW8MapPGXX_bIRkkNDRcIFdDMIJGsvnuoQll7BZffr7GaSesr1D_1dWFSg2woHC7Mc6hPcdcQVnOCaGFCGNaxNeTWhMH74mcrsdOacIn1r2zP5g5OWdgw72J-6oJ0r47PfVEZdCke5ZTYAG-8Ckt-uL87hHoAYhiAcBkAcCqAemvhuoB9nLG6gHz8wb2AcA0ggCEAI%2526num%253D1%2526cid%253DCAMSeQClSFh3Hr7OOfj2ykVMLFohDSV9WdljTXm2A1V8U5aNW_vjmyoZmBj4MnsFqvHRy8yJJEz9UgZ13Oa3SdRRFpFHddLN-g8EtDCNLPrXCiyXYG3ohzyiL6Da-4ZQzNUAwH6Fd0SgWbj_L-U8m_G_e2LcOfCHOMoDFPg%2526sig%253DAOD64_2M1yFY2c7Mx5_Au8z5GYEPbV7Oyg%2526client%253Dca-pub-4906753266448300%2526adurl%253D%26bt%3D36%26pz%3D3%26bn%3D0%26width%3D728%26height%3D90%26rnd%3D438095922%26geozoneid%3D63%26rleurl%3Dhttps://www.schneider-electric.ru/ru/product-range-presentation/65439?utm_source=Programmatic&utm_medium=RTB&utm_campaign=unika&utm_content=all_Soloway%26target%3D_blank%26sliceid%3D1509165%26uid%3D132451375893%26extension%3D necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/2.0 200 OK
+server: nginx/1.10.3
+date: Wed, 27 Mar 2019 14:55:25 GMT
+content-type: text/html
+content-length: 8804
+last-modified: Thu, 28 Jun 2018 14:55:27 GMT
+etag: "5b34f6df-2264"
+accept-ranges: bytes
+X-Firefox-Spdy: h2
+ original-response-headers server: nginx/1.10.3
+date: Wed, 27 Mar 2019 14:55:25 GMT
+content-type: text/html
+content-length: 8804
+last-modified: Thu, 28 Jun 2018 14:55:27 GMT
+etag: "5b34f6df-2264"
+accept-ranges: bytes
+X-Firefox-Spdy: h2
+ uncompressed-len 0 net-response-time-onstart 494 net-response-time-onstop 499 predictor::resource-count 1 predictor::https://servers1.adriver.ru/images/0005685/0005685309/0/1.gif 1,1,1553698525,4096   "d

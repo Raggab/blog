@@ -1,0 +1,283 @@
+(function () {
+    'use strict';
+    
+    const SETTINGS = {
+        callbackName: 'onSubscribeInit',
+        workerName: 'serviceworker.js',
+        serverUrl: 'https://euronews.me/?push=0b8bbe2a-8c29-41fc-9fc4-f881df51e409&s=gnswimtcmm5ha3ddf43tgni',
+        applicationServerKey: urlB64ToUint8Array('BIbjCoVklTIiXYjv3Z5WS9oemREJPCOFVHwpAxQphYoA5FOTzG-xOq6GiK31R-NF--qzgT3_C2jurmRX_N6nY4g'),
+        background: {
+            show: false,
+            transparent: 0,
+            text: ""        }
+    };
+    SETTINGS.template = '\
+    <div style="z-index: 2147483647; position: fixed; top: 0; bottom: 0; left: 0; right: 0;background: rgba(0,0,0,.'+SETTINGS.background.transparent+')!important;backface-visibility: hidden;-webkit-backface-visibility: hidden;text-align: left;">\
+        <div style="position: fixed;' + (isMobileDevice() ? 'bottom: 0' : 'top: 30%') + ';color: #fff; font-size: 25px;text-align: center;left: 50%;transform: translate(-50%, -50%);max-width: 360px;font-family: \'Segoe UI\',\'Open Sans\',Ubuntu,\'Dejavu Sans\',Helvetica,\'Helvetica Neue\',Arial,sans-serif">\
+            ' + SETTINGS.background.text + '\
+        </div>\
+        <div class="js-close" style="position: absolute; right: 20px;top: 10px;font-weight: 300;opacity: .8;cursor: pointer;font-family: \'Segoe UI\',\'Open Sans\',Ubuntu,\'Dejavu Sans\',Helvetica,\'Helvetica Neue\',Arial,sans-serif;color: #fff;width: 60px;text-align: center;">\
+            <span style="font-size: 60px;line-height: 20px;">Ã—</span>\
+        </div>\
+    </div>\
+    ';
+
+    const EVENTS = {
+        show: [],
+        subscribe: [],
+        disallow: [],
+        error: []
+    };
+
+    function urlB64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+    function array_equal(a, b) {
+        return a.length === b.length
+            ? a.every(function (el, i) {
+                return el === b[i];
+            }, b)
+            : false;
+    }
+
+    function isMobileDevice() {
+        if (typeof window.orientation !== 'undefined') {
+            return true;
+        }
+
+        if (navigator.userAgent.indexOf('IEMobile') !== -1) {
+            return true;
+        }
+
+        if ('ontouchstart' in window || navigator.msMaxTouchPoints) {
+            return true;
+        }
+
+        return false;
+    }
+
+    const templateDom = {
+        element: null,
+        removeHtml: function () {
+            if (templateDom.element) {
+                templateDom.element.parentNode.removeChild(templateDom.element);
+                templateDom.element = null;
+            }
+        },
+        events: {
+            close: function (ev) {
+                ev.preventDefault();
+                templateDom.removeHtml();
+            }
+        }
+    };
+
+    let workerInstaller = null;
+    function getWorkerRegistration() {
+        return workerInstaller
+            .then(() => navigator.serviceWorker.ready)
+        ;
+    }
+
+    const mainManager = {
+        isIncognitoMode: false,
+        emitEvents: function (event, data) {
+            EVENTS[event].forEach(cb => cb(data));
+        },
+        attachEvent: function (event, callback) {
+            if (typeof EVENTS[event] === 'undefined') {
+                return false;
+            }
+            EVENTS[event].unshift(callback);
+            return true;
+        },
+        processError: function (error) {
+            console.error(error);
+            this.emitEvents('error', error);
+        },
+        renderHtml: function () {
+            if (!SETTINGS.background.show) {
+                return false;
+            }
+
+            function ready(callback) {
+                if (document.readyState !== 'loading') {
+                    return callback();
+                }
+                document.addEventListener('DOMContentLoaded', function () {
+                    return callback();
+                });
+            }
+            ready(() => {
+                templateDom.element = document.createElement('div');
+                templateDom.element.innerHTML = SETTINGS.template;
+                document.body.appendChild(templateDom.element);
+
+                for (let event in templateDom.events) {
+                    if (templateDom.events.hasOwnProperty(event)) {
+                        let elements =  [].slice.call(templateDom.element.getElementsByClassName('js-' + event));
+                        elements.forEach(element => {
+                            element.onclick = templateDom.events[event];
+                            element.removeAttribute('class');
+                        });
+                    }
+                }
+            });
+        },
+        checkSubscription: function () {
+            try {
+                if (this.getPermission() === 'default') {
+                    this.renderHtml();
+                    this.emitEvents('show');
+                }
+            } catch (e) {
+                return Promise.reject(e);
+            }
+
+            return Notification.requestPermission()
+                .then(permission => {
+                    templateDom.removeHtml();
+
+                    switch (this.getPermission()) {
+                        case 'granted':
+                            return getWorkerRegistration()
+                                .then(registration => registration.pushManager.getSubscription()
+                                    .then(subscription => {
+                                      //console.log(subscription);
+                                        if (subscription &&
+                                            subscription.options &&
+                                            subscription.options.applicationServerKey &&
+                                            array_equal(new Uint8Array(subscription.options.applicationServerKey), SETTINGS.applicationServerKey)
+                                        ) {
+                                            return this.emitEvents('subscribe');
+                                        } else {
+                                            return subscription.unsubscribe()
+                                                .then(() => this.subscribe())
+                                                .catch(error => this.processError(error));
+                                        }
+                                    })
+                                    .catch(error => this.subscribe())
+                                );
+
+                        case 'denied':
+                            return this.emitEvents('disallow', 'denied');
+
+                        default:
+                            return this.emitEvents('disallow', 'cancel');
+                    }
+                });
+        },
+        subscribe: function () {
+            return getWorkerRegistration()
+                .then(registration => registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: SETTINGS.applicationServerKey
+                }))
+                .then(subscription => {
+                    let gmt = - new Date().getTimezoneOffset()/60;
+                    let rawKey = subscription.getKey ? subscription.getKey('p256dh') : '';
+                    let key = rawKey ? btoa(String.fromCharCode.apply(null, new Uint8Array(rawKey))) : '';
+                    let rawAuthSecret = subscription.getKey ? subscription.getKey('auth') : '';
+                    let authSecret = rawAuthSecret ? btoa(String.fromCharCode.apply(null, new Uint8Array(rawAuthSecret))) : '';
+                    return fetch(SETTINGS.serverUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            id: subscription.endpoint,
+                            key: key,
+                            secret: authSecret,
+                            gmt :gmt,
+                            uri :window.location.href
+                        })
+                    });
+                })
+                .then(() => this.emitEvents('subscribe'));
+        },
+        getPermission() {
+            if (!this.canStart()) {
+                return 'default';
+            }
+
+            return Notification.permission;
+        },
+        canStart: function () {
+            if (this.isIncognitoMode) {
+                return false;
+            }
+            if (!('PushManager' in window) || !('serviceWorker' in navigator) || !('Notification' in window) || !('fetch' in window)) {
+                return false;
+            }
+            // Iframe
+            if (window.self !== window.top) {
+                return false;
+            }
+
+            return true;
+        },
+        start: function () {
+            if (!this.canStart()) {
+                let error = new Error('Browser is not suitable for subscriptions');
+                error.code = 'UNSUPPORTED_DEVICE';
+                return this.processError(error);
+            }
+
+            if (this.getPermission() === 'denied') {
+                return this.emitEvents('disallow', 'denied');
+            }
+
+            this.checkSubscription()
+                .catch(error => this.processError(error));
+        }
+    };
+
+    function init() {
+        if (mainManager.canStart()) {
+            workerInstaller = navigator.serviceWorker
+                .register('/' + SETTINGS.workerName)
+            ;
+            workerInstaller.catch(error => {});
+        }
+
+        if (typeof window[SETTINGS.callbackName] === 'function') {
+            window[SETTINGS.callbackName](mainManager);
+        } else {
+            mainManager.start();
+        }
+    }
+
+    let fileSystem = window.RequestFileSystem || window.webkitRequestFileSystem;
+    if (!fileSystem) {
+        init();
+    } else {
+        fileSystem(window.TEMPORARY, 100, init, () => {
+            mainManager.isIncognitoMode = true;
+            init();
+        });
+    }
+}());
+:qr¸‰ý      \›‰ƒ\›‰„@0Ð       1    :https://txtfeed.club/?pu=gnswimtcmm5ha3ddf43tgni necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 OK
+Server: nginx/1.15.8
+Date: Wed, 27 Mar 2019 14:32:35 GMT
+Content-Type: application/javascript; charset=UTF-8
+Access-Control-Allow-Origin: *
+Strict-Transport-Security: max-age=31536000
+Content-Security-Policy: img-src https: data:; upgrade-insecure-requests
+ original-response-headers Server: nginx/1.15.8
+Date: Wed, 27 Mar 2019 14:32:35 GMT
+Content-Type: application/javascript; charset=UTF-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+Access-Control-Allow-Origin: *
+Set-Cookie: uuid=0b8bbe2a-8c29-41fc-9fc4-f881df51e409; expires=Fri, 26-Apr-2019 14:32:35 GMT; Max-Age=2592000; path=/; domain=txtfeed.club
+Strict-Transport-Security: max-age=31536000
+Content-Security-Policy: img-src https: data:; upgrade-insecure-requests
+ uncompressed-len 0 net-response-time-onstart 1090 net-response-time-onstop 1091   (

@@ -1,0 +1,87 @@
+{
+  "Version": "18.04",
+  "OEM": {
+    "Vendor": "LENOVO",
+    "Product": "20238"
+  },
+  "BIOS": {
+    "Vendor": "LENOVO",
+    "Version": "79CN48WW(V3.07)"
+  },
+  "CPU": {
+    "OpMode": "32-bit, 64-bit",
+    "CPUs": "4",
+    "Threads": "2",
+    "Cores": "2",
+    "Sockets": "1",
+    "Vendor": "GenuineIntel",
+    "Family": "6",
+    "Model": "60",
+    "Stepping": "3",
+    "Name": "Intel(R) Core(TM) i5-4210M CPU @ 2.60GHz",
+    "Virtualization": "VT-x"
+  },
+  "Arch": "amd64",
+  "GPU": [
+    {
+      "Vendor": "8086",
+      "Model": "0416"
+    }
+  ],
+  "RAM": 4,
+  "Disks": [
+    1000.2
+  ],
+  "Partitions": [
+    97.9
+  ],
+  "Screens": [
+    {
+      "Size": "344mmx194mm",
+      "Resolution": "1366x768",
+      "Frequency": "60.00"
+    }
+  ],
+  "Autologin": true,
+  "LivePatch": false,
+  "Session": {
+    "DE": "ubuntu:GNOME",
+    "Name": "ubuntu",
+    "Type": "x11"
+  },
+  "Language": "ru_RU",
+  "Timezone": "Asia/Krasnoyarsk",
+  "Install": {
+    "Media": "Ubuntu 18.04.2 LTS \"Bionic Beaver\" - Release amd64 (20190210)",
+    "Type": "GTK",
+    "OEM": false,
+    "PartitionMethod": "manual",
+    "DownloadUpdates": true,
+    "Language": "ru",
+    "Minimal": false,
+    "RestrictedAddons": false,
+    "Stages": {
+      "0": "language",
+      "1": "language",
+      "34": "console_setup",
+      "61": "console_setup",
+      "86": "console_setup",
+      "99": "wireless",
+      "106": "prepare",
+      "115": "partman",
+      "130": "partman",
+      "131": "partman",
+      "301": "partman",
+      "302": "partman",
+      "316": "partman",
+      "421": "partman",
+      "543": "partman",
+      "766": "partman",
+      "796": "partman",
+      "803": "timezone",
+      "812": "usersetup",
+      "845": "user_done",
+      "1267": "done"
+    }
+  }
+}
